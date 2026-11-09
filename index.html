@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>ระบบเช็คอิน QR Code</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Kanit', sans-serif; background: #e3f2fd; color: #0d47a1; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; }
+  .container { width: 95%; max-width: 550px; margin: 20px auto; padding: 30px 20px; background: #fff; border-radius: 16px; box-shadow: 0 12px 24px rgba(0,0,0,.15); text-align: center; box-sizing: border-box; }
+  h1 { font-size: 2rem; font-weight: 700; margin: 0 0 4px; color: #1565c0; }
+  .event-name { font-size: 1.05rem; font-weight: 500; color: #1565c0; margin: 0 0 10px; }
+  p { font-size: 1rem; color: #546e7a; margin: 0 0 20px; }
+  #logo { width: 60%; max-width: 200px; margin-bottom: 16px; display: none; }
+  #stats { display: flex; gap: 10px; margin-bottom: 20px; }
+  .stat { flex: 1; background: #f1f8fe; border-radius: 10px; padding: 8px; }
+  .stat b { display: block; font-size: 1.6rem; color: #1565c0; }
+  .stat span { font-size: .85rem; color: #546e7a; }
+  #videoContainer { position: relative; width: 100%; height: 0; padding-top: 75%; margin-bottom: 20px; overflow: hidden; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,.25); background: #000; display: none; }
+  #video, #canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+  #canvas { z-index: 10; }
+  .hidden { display: none !important; }
+  .button-group { display: flex; flex-direction: column; gap: 12px; margin: 0 auto 20px; width: 100%; max-width: 400px; }
+  button { font-family: 'Kanit', sans-serif; padding: 14px 30px; font-size: 1.05rem; font-weight: 600; border: none; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.1); }
+  button:active { transform: scale(.98); }
+  #startButton { background: #0076c0; color: #fff; }
+  #stopButton { background: #ef9a9a; color: #b71c1c; }
+  #dismissButton { background: #4db6ac; color: #fff; margin-top: 15px; width: 100%; max-width: 400px; }
+  .manual { display: flex; gap: 8px; max-width: 400px; margin: 0 auto 25px; }
+  .manual input { flex: 1; min-width: 0; font-family: 'Kanit', sans-serif; font-size: 1rem; padding: 10px 14px; border: 1px solid #b0bec5; border-radius: 30px; text-transform: uppercase; }
+  .manual button { padding: 10px 18px; background: #e3f2fd; color: #0d47a1; }
+  #result { min-height: 80px; display: flex; align-items: center; justify-content: center; padding: 20px; border-radius: 10px; font-size: 1.2rem; font-weight: 500; box-shadow: inset 0 1px 5px rgba(0,0,0,.1); white-space: pre-wrap; line-height: 1.4; margin-bottom: 10px; }
+  .status-success { background: #c8e6c9; color: #2e7d32; }
+  .status-warning { background: #fff9c4; color: #ff8f00; }
+  .status-error   { background: #ffcdd2; color: #c62828; }
+  .status-initial { background: #e0e0e0; color: #424242; }
+  #nameBox { margin-bottom: 20px; padding: 15px; border-radius: 10px; background: #e0f2f1; border: 2px solid #80cbc4; }
+  #nameBox p { margin: 0; font-weight: 500; color: #004d40; }
+  #checkinName { font-size: 2.2rem; font-weight: 700; color: #004d40; margin-top: 5px; line-height: 1.2; }
+  #checkinOrg { font-size: 1rem; color: #00695c; margin-top: 4px; }
+  #rankBox { margin-bottom: 20px; padding: 15px; border-radius: 10px; background: #bbdefb; border: 2px solid #64b5f6; }
+  #rankBox p { margin: 0; font-weight: 500; color: #0d47a1; }
+  #checkinRank { font-size: 3rem; font-weight: 700; color: #1565c0; margin-top: 5px; line-height: 1.1; }
+  #setup { text-align: left; }
+  #setup input { width: 100%; box-sizing: border-box; font-family: inherit; font-size: .95rem; padding: 10px; margin: 6px 0 14px; border: 1px solid #b0bec5; border-radius: 8px; }
+  @media (min-width: 600px) { .button-group { flex-direction: row; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- หน้าตั้งค่า (แสดงเมื่อยังไม่มี api/key) -->
+  <div id="setup" class="hidden">
+    <h1 style="text-align:center">ตั้งค่าหน้าสแกน</h1>
+    <p>เปิดหน้านี้ด้วยลิงก์ที่มีการตั้งค่ามาให้แล้ว หรือกรอกข้อมูลด้านล่าง</p>
+    <label>Web app URL (ลงท้ายด้วย /exec)</label>
+    <input id="setupApi" placeholder="https://script.google.com/macros/s/.../exec">
+    <label>รหัสเข้าใช้งาน (key)</label>
+    <input id="setupKey">
+    <button id="setupSave" style="background:#0076c0;color:#fff;width:100%">บันทึกและเริ่มใช้งาน</button>
+  </div>
+
+  <!-- หน้าสแกน -->
+  <div id="app" class="hidden">
+    <img id="logo" alt="Logo">
+    <h1>ระบบเช็คอินเข้างาน</h1>
+    <div class="event-name" id="eventName"></div>
+    <p>โปรดสแกน QR Code จากโทรศัพท์มือถือของผู้ลงทะเบียนเพื่อยืนยันการเข้าร่วม</p>
+
+    <div id="stats">
+      <div class="stat"><b id="statIn">-</b><span>เช็คอินแล้ว</span></div>
+      <div class="stat"><b id="statTotal">-</b><span>ลงทะเบียนทั้งหมด</span></div>
+    </div>
+
+    <div id="videoContainer">
+      <video id="video" playsinline muted class="hidden"></video>
+      <canvas id="canvas" class="hidden"></canvas>
+    </div>
+
+    <div class="button-group">
+      <button id="startButton">เปิดกล้องเพื่อสแกน</button>
+      <button id="stopButton" class="hidden">ปิดกล้อง</button>
+    </div>
+
+    <div class="manual">
+      <input id="manualId" placeholder="หรือพิมพ์รหัส เช่น REG-ABC123">
+      <button id="manualButton">ตรวจสอบ</button>
+    </div>
+
+    <div id="nameBox" class="hidden">
+      <p>ชื่อผู้ลงทะเบียน:</p>
+      <div id="checkinName">-</div>
+      <div id="checkinOrg"></div>
+    </div>
+
+    <div id="rankBox" class="hidden">
+      <p>ลำดับที่เช็คอิน:</p>
+      <div id="checkinRank">-</div>
+    </div>
+
+    <div id="result" class="status-initial">ระบบพร้อมสำหรับการสแกน</div>
+    <button id="dismissButton" class="hidden">ตกลง, สแกนคนต่อไป</button>
+  </div>
+</div>
+
+<script>
+  // ===== การตั้งค่า: อ่านจากลิงก์ (#api=...&key=...) แล้วจำไว้ในเครื่อง =====
+  const STORE = 'qrCheckinConfig';
+  function loadConfig() {
+    const h = new URLSearchParams(location.hash.slice(1));
+    if (h.get('api') && h.get('key')) {
+      const cfg = { api: h.get('api'), key: h.get('key') };
+      try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) {}
+      history.replaceState(null, '', location.pathname); // ซ่อน key ออกจากแถบที่อยู่
+      return cfg;
+    }
+    try { return JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) { return null; }
+  }
+  let CFG = loadConfig();
+
+  const $ = id => document.getElementById(id);
+  const video = $('video'), canvasEl = $('canvas'), ctx = canvasEl.getContext('2d', { willReadFrequently: true });
+  let stream = null, rafId = null, isScanning = false, isChecking = false;
+
+  function show(el, on) { $(el).classList.toggle('hidden', !on); }
+
+  function displayResult(message, type) {
+    $('result').textContent = message;
+    $('result').className = 'status-' + (type || 'initial');
+  }
+
+  async function callApi(params) {
+    const url = CFG.api + '?' + new URLSearchParams(Object.assign({ key: CFG.key }, params)).toString();
+    const res = await fetch(url, { method: 'GET', redirect: 'follow' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+
+  function applyMeta(r) {
+    if (r.eventName) $('eventName').textContent = r.eventName;
+    if (r.logo) { $('logo').src = r.logo; $('logo').style.display = 'inline-block'; }
+    if (r.prefix) $('manualId').placeholder = 'หรือพิมพ์รหัส เช่น ' + r.prefix + '-ABC123';
+    if (r.checkedIn !== undefined) $('statIn').textContent = r.checkedIn;
+    if (r.total !== undefined) $('statTotal').textContent = r.total;
+  }
+
+  async function refreshStats() {
+    try { applyMeta(await callApi({ action: 'stats' })); } catch (e) { /* ไม่ต้องแจ้ง */ }
+  }
+
+  // ===== กล้อง (ใช้วิธีเดียวกับระบบเดิม) =====
+  async function startCamera() {
+    try {
+      show('nameBox', false); show('rankBox', false); show('dismissButton', false);
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      video.srcObject = stream;
+      video.setAttribute('playsinline', true);
+      $('videoContainer').style.display = 'block';
+      show('video', true); show('canvas', false);
+      show('startButton', false); show('stopButton', true);
+      await video.play();
+      if (video.videoWidth && video.videoHeight) {
+        $('videoContainer').style.paddingTop = (video.videoHeight / video.videoWidth * 100) + '%';
+      }
+      isScanning = true;
+      displayResult('กล้องเปิดแล้ว: เริ่มการสแกน...');
+      scanLoop();
+    } catch (err) {
+      let msg = '❌ เปิดกล้องไม่ได้: ' + err.name;
+      if (err.name === 'NotAllowedError') msg = '❌ ไม่ได้รับอนุญาตให้ใช้กล้อง กรุณาอนุญาตกล้องในเบราว์เซอร์';
+      else if (err.name === 'NotFoundError') msg = '❌ ไม่พบกล้องในอุปกรณ์';
+      stopCamera(true);
+      displayResult(msg, 'error');
+    }
+  }
+
+  function stopCamera(keepMessage) {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null; isScanning = false;
+    $('videoContainer').style.display = 'none';
+    show('video', false); show('canvas', false);
+    show('startButton', true); show('stopButton', false);
+    if (keepMessage !== true) displayResult('พร้อมสำหรับการสแกน');
+  }
+
+  function scanLoop() {
+    if (!isScanning || !video.srcObject) return;
+    rafId = requestAnimationFrame(scanLoop);
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    canvasEl.width = video.videoWidth;
+    canvasEl.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvasEl.width, canvasEl.height);
+    const img = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+    if (code && code.data) {
+      isScanning = false;
+      drawBox(code.location);
+      if (navigator.vibrate) navigator.vibrate(80);
+      sendCheckIn(code.data);
+    }
+  }
+
+  function drawBox(loc) {
+    show('canvas', true);
+    ctx.strokeStyle = '#ffeb3b'; ctx.lineWidth = 6;
+    const pts = [loc.topLeftCorner, loc.topRightCorner, loc.bottomRightCorner, loc.bottomLeftCorner, loc.topLeftCorner];
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+  }
+
+  // ===== เช็คอิน =====
+  async function sendCheckIn(id) {
+    id = String(id || '').trim().toUpperCase();
+    if (!id || isChecking) return;
+    isChecking = true; isScanning = false;
+    displayResult('กำลังตรวจสอบรหัส: ' + id + '...');
+    show('nameBox', false); show('rankBox', false);
+    try {
+      const r = await callApi({ action: 'checkin', id: id });
+      displayResult(r.message || '', r.status === 'success' ? 'success' : r.status === 'warning' ? 'warning' : 'error');
+      if (r.name) {
+        $('checkinName').textContent = r.name;
+        $('checkinOrg').textContent = r.org || '';
+        show('nameBox', true);
+      }
+      if (r.order) { $('checkinRank').textContent = '#' + r.order; show('rankBox', true); }
+      applyMeta(r);
+    } catch (e) {
+      displayResult('❌ เชื่อมต่อระบบไม่ได้: ' + e.message + '\nตรวจสอบอินเทอร์เน็ต หรือการตั้งค่า Web app', 'error');
+    }
+    show('dismissButton', true);
+  }
+
+  function dismissResult() {
+    isChecking = false;
+    $('manualId').value = '';
+    show('nameBox', false); show('rankBox', false); show('dismissButton', false);
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    show('canvas', false);
+    if (stream) { displayResult('พร้อมสำหรับการสแกนคนต่อไป...'); isScanning = true; scanLoop(); }
+    else displayResult('พร้อมสำหรับการสแกน');
+  }
+
+  // ===== เริ่มต้น =====
+  function startApp() {
+    show('setup', false); show('app', true);
+    refreshStats();
+    setInterval(refreshStats, 30000);
+  }
+
+  $('startButton').onclick = startCamera;
+  $('stopButton').onclick = () => stopCamera();
+  $('dismissButton').onclick = dismissResult;
+  $('manualButton').onclick = () => sendCheckIn($('manualId').value);
+  $('manualId').addEventListener('keydown', e => { if (e.key === 'Enter') $('manualButton').click(); });
+  $('setupSave').onclick = () => {
+    const api = $('setupApi').value.trim(), key = $('setupKey').value.trim();
+    if (!api || !key) return;
+    CFG = { api: api, key: key };
+    try { localStorage.setItem(STORE, JSON.stringify(CFG)); } catch (e) {}
+    startApp();
+  };
+
+  if (CFG && CFG.api && CFG.key) startApp(); else show('setup', true);
+</script>
+</body>
+</html>
